@@ -48,6 +48,7 @@
     "url": "https://github.com/AgoraIO-Community/app-builder-core"
   },
   "dependencies": {
+	"agora-rn-uikit": "^1.1.1",
     "@datadog/browser-logs": "^5.15.0",
     "@datadog/mobile-react-native": "^2.3.2",
     "@gorhom/bottom-sheet": "4.4.7",
