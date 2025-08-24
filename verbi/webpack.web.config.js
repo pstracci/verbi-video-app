@@ -25,6 +25,19 @@ module.exports = merge(commons, {
   output: {
     path: path.resolve(__dirname, `../Builds/web`),
   },
+  // --- ALTERAÇÃO ADICIONADA AQUI ---
+  // A seção 'resolve' ajuda o Webpack a encontrar os pacotes.
+  resolve: {
+    // 'alias' cria um atalho.
+    alias: {
+      // Diz ao Webpack para encontrar o 'agora-rn-uikit' diretamente na pasta node_modules.
+      'agora-rn-uikit': path.resolve(__dirname, 'node_modules/agora-rn-uikit'),
+    },
+    // Se você já tiver uma propriedade 'extensions' aqui, mantenha-a.
+    // Exemplo: extensions: ['.js', '.jsx', '.ts', '.tsx'],
+  },
+  // --- FIM DA ALTERAÇÃO ---
+
   // Webpack dev server config
   devServer: {
     port: 9000,
