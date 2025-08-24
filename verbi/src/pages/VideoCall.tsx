@@ -10,7 +10,7 @@
 *********************************************
 */
 // @ts-nocheck
-import React, {useState, useContext, useEffect, useRef} from 'react';
+import React, {useState, useContext, useEffect} from 'react';
 import {View, StyleSheet, Text} from 'react-native';
 import {
   RtcConfigure,
@@ -22,11 +22,11 @@ import {
   CallbacksInterface,
 } from '../../agora-rn-uikit';
 import styles from '../components/styles';
-import {useHistory} from '../components/Router'; // Removido useParams
+import {useHistory} from '../components/Router';
 import RtmConfigure from '../components/RTMConfigure';
 import DeviceConfigure from '../components/DeviceConfigure';
 import Logo from '../subComponents/Logo';
-import {useHasBrandLogo, isMobileUA, isWebInternal} from '../utils/common';
+import {useHasBrandLogo, isMobileUA} from '../utils/common';
 import {videoView} from '../../theme.json';
 import {LiveStreamContextProvider} from '../components/livestream';
 import ScreenshareConfigure from '../subComponents/screenshare/ScreenshareConfigure';
@@ -35,11 +35,9 @@ import {PreCallProvider} from '../components/precall/usePreCall';
 import {LayoutProvider} from '../utils/useLayout';
 import Precall from '../components/Precall';
 import {RecordingProvider} from '../subComponents/recording/useRecording';
-// import useJoinRoom from '../utils/useJoinRoom'; // REMOVIDO
 import {
   useRoomInfo,
   RoomInfoDefaultValue,
-  WaitingRoomStatus,
 } from '../components/room-info/useRoomInfo';
 import {SidePanelProvider} from '../utils/useSidePanel';
 import {NetworkQualityProvider} from '../components/NetworkQualityContext';
@@ -56,7 +54,6 @@ import PermissionHelper from '../components/precall/PermissionHelper';
 import {FocusProvider} from '../utils/useFocus';
 import {VideoCallProvider} from '../components/useVideoCall';
 import {SdkApiContext} from '../components/SdkApiContext';
-import isSDK from '../utils/isSDK';
 import {CaptionProvider} from '../subComponents/caption/useCaption';
 import SdkMuteToggleListener from '../components/SdkMuteToggleListener';
 import StorageContext from '../components/StorageContext';
@@ -69,7 +66,6 @@ import {WaitingRoomProvider} from '../components/contexts/WaitingRoomContext';
 import {isValidReactComponent} from '../utils/common';
 import {ChatMessagesProvider} from '../components/chat-messages/useChatMessages';
 import VideoCallScreenWrapper from './video-call/VideoCallScreenWrapper';
-import {useIsRecordingBot} from '../subComponents/recording/useIsRecordingBot';
 import {
   userBannedText,
   videoRoomStartingCallText,
@@ -80,7 +76,6 @@ import {useCustomization} from 'customization-implementation';
 import {BeautyEffectProvider} from '../components/beauty-effect/useBeautyEffects';
 import {UserActionMenuProvider} from '../components/useUserActionMenu';
 import Toast from '../../react-native-toast-message';
-import {AuthErrorCodes} from '../utils/common';
 
 enum RnEncryptionEnum {
   None = 0,
@@ -100,9 +95,7 @@ const VideoCall: React.FC = () => {
   const {setGlobalErrorMessage} = useContext(ErrorContext);
   const {awake, release} = useWakeLock();
 
-  // --- NOVA LÓGICA DE SEGURANÇA ---
   const [authError, setAuthError] = useState(null);
-  // --- FIM DA NOVA LÓGICA ---
 
   const [callActive, setCallActive] = useState(false);
   const [isRecordingActive, setRecordingActive] = useState(false);
@@ -111,12 +104,7 @@ const VideoCall: React.FC = () => {
   const [recordingAutoStarted, setRecordingAutoStarted] = useState(false);
 
   const {store} = useContext(StorageContext);
-  const {
-    join: SdkJoinState,
-    microphoneDevice: sdkMicrophoneDevice,
-    cameraDevice: sdkCameraDevice,
-    clearState,
-  } = useContext(SdkApiContext);
+  const {clearState} = useContext(SdkApiContext);
 
   const afterEndCall = useCustomization(
     data =>
@@ -150,7 +138,7 @@ const VideoCall: React.FC = () => {
     profile: $config.PROFILE,
     screenShareProfile: $config.SCREEN_SHARE_PROFILE,
     dual: true,
-    encryption: false, // Encryption disabled for simplicity, can be re-enabled
+    encryption: false,
     role: ClientRoleType.ClientRoleBroadcaster,
     geoFencing: $config.GEO_FENCING,
     audioRoom: $config.AUDIO_ROOM,
@@ -161,7 +149,8 @@ const VideoCall: React.FC = () => {
 
   const history = useHistory();
   const {setRoomInfo} = useSetRoomInfo();
-  
+  const { data } = useRoomInfo();
+
   React.useEffect(() => {
     return () => {
       logger.debug(
@@ -169,36 +158,32 @@ const VideoCall: React.FC = () => {
         'VIDEO_CALL_ROOM',
         'Videocall unmounted',
       );
-      setRoomInfo(prevState => {
-        return {
-          ...RoomInfoDefaultValue,
-          loginToken: prevState?.loginToken,
-        };
-      });
+      setRoomInfo(prevState => ({
+        ...RoomInfoDefaultValue,
+        loginToken: prevState?.loginToken,
+      }));
       if (awake) {
         release();
       }
     };
   }, []);
 
-  // --- NOVA LÓGICA DE SEGURANÇA ADICIONADA ---
   useEffect(() => {
-    // Esta função será executada apenas uma vez quando o componente carregar
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     const channel = urlParams.get('channel');
     const uidString = urlParams.get('uid');
-    
-    // Verifica se os parâmetros necessários existem na URL
+
     if (!token || !channel || !uidString) {
-      setAuthError("Acesso inválido ou expirado. Por favor, crie uma sala a partir do site principal do Verbi.");
-      return; // Para a execução
+      setAuthError(
+        'Acesso inválido ou expirado. Por favor, crie uma sala a partir do site principal do Verbi.',
+      );
+      return;
     }
 
-    // Se os parâmetros existirem, configura as propriedades do RTC
     const uid = Number(uidString);
     if (isNaN(uid)) {
-      setAuthError("UID inválido.");
+      setAuthError('UID inválido.');
       return;
     }
 
@@ -208,13 +193,10 @@ const VideoCall: React.FC = () => {
       uid: uid,
       token: token,
     }));
-    
-    // Ativa a tela de chamada
-    setCallActive(true);
-    // Marca a "query" como completa para remover a tela de loading
-    setQueryComplete(true);
 
-  }, []); // O array vazio [] garante que isso só rode uma vez
+    setCallActive(true);
+    setQueryComplete(true);
+  }, []);
 
   const callbacks: CallbacksInterface = {
     EndCall: () => {
@@ -260,11 +242,24 @@ const VideoCall: React.FC = () => {
     },
   };
 
-  // --- LÓGICA DE RENDERIZAÇÃO ATUALIZADA ---
   if (authError) {
     return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000'}}>
-        <Text style={{color: '#fff', fontSize: 18, paddingHorizontal: 20, textAlign: 'center'}}>{authError}</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#000',
+        }}>
+        <Text
+          style={{
+            color: '#fff',
+            fontSize: 18,
+            paddingHorizontal: 20,
+            textAlign: 'center',
+          }}>
+          {authError}
+        </Text>
       </View>
     );
   }
@@ -386,7 +381,9 @@ const VideoCall: React.FC = () => {
         </PropsProvider>
       ) : (
         <View style={style.loader}>
-          <View style={style.loaderLogo}>{hasBrandLogo() && <Logo />}</View>
+          <View style={style.loaderLogo}>
+            {hasBrandLogo() && <Logo />}
+          </View>
           <Text style={style.loaderText}>{joiningLoaderLabel}</Text>
         </View>
       )}
